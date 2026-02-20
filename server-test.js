@@ -19,8 +19,10 @@ import configRoutes from './js/server-routes'
 
 const dbName = 'oscon-test'
 
-const privateKey = fs.readFileSync('/home/brianc/CERTS/scene-history_org.key'),
-  certificate = fs.readFileSync('/home/brianc/CERTS/www_scene-history_org_combined.crt'),
+const tlsKeyPath = process.env.TLS_KEY_PATH || '/home/brianc/CERTS/scene-history_org.key'
+const tlsCertPath = process.env.TLS_CERT_PATH || '/home/brianc/CERTS/www_scene-history_org_combined.crt'
+const privateKey = fs.readFileSync(tlsKeyPath),
+  certificate = fs.readFileSync(tlsCertPath),
   credentials = {key: privateKey, cert: certificate}
 
 const app = express(),
@@ -47,8 +49,15 @@ const server = http.createServer(app)
 const sserver = https.createServer( credentials, app )
 
 // CORS allows us to fetch images on local-hosted server
-//  The Wikipedia page is really good
-app.use(cors())
+const corsOrigins = process.env.CORS_ORIGINS
+  ? process.env.CORS_ORIGINS.split(',').map(s => s.trim())
+  : ['http://localhost:8080', 'https://localhost:4443']
+
+app.use(cors({
+  origin: corsOrigins,
+  methods: ['GET', 'POST'],
+  allowedHeaders: ['Content-Type']
+}))
 
 // Compress outbound service
 app.use(compression())
@@ -76,7 +85,8 @@ mongoose.Promise = global.Promise;
 // assert.equal(query.exec().constructor, global.Promise);
 
 // Connect to mongo database
-mongoose.connect('mongodb://localhost/' + dbName)
+const mongoHost = process.env.MONGO_HOST || 'localhost'
+mongoose.connect('mongodb://' + mongoHost + '/' + dbName)
 
 // start HTTP server
 server.listen(8080)

@@ -37,3 +37,6 @@ public/js/
 
 # Release files
 release-builds
+
+# Environment variables
+.env

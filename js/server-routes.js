@@ -32,6 +32,42 @@ let savedSubscription = null,
   customMessage = null,
   subscriptions = []
 
+function uploadFile(req, res) {
+  return new Promise((resolve, reject) => {
+    upload(req, res, (err) => {
+      if (err) reject(err)
+      else resolve()
+    })
+  })
+}
+
+function sharpToFile(pipeline, outputPath) {
+  return new Promise((resolve, reject) => {
+    pipeline.toFile(outputPath, (err, info) => {
+      if (err) reject(err)
+      else resolve(info)
+    })
+  })
+}
+
+// Non-persistent save routine--refreshes with server restart
+function saveSubscriptionToDatabase(subscription, ipAddr, port) {
+  console.log('In save part of routine')
+  let source = ipAddr + ':' + port
+  // Cut syntactic ipv6 cruft from front of address
+  source = source.slice(7)
+  console.log('Source: ' +  source)
+
+  // In memory database store
+  subscriptions[source] = subscription
+
+  // Debugging time; let's log whole array
+  for (let [source, subscription] of Object.entries(subscriptions)) {
+      console.log("Entry: " + JSON.stringify(subscriptions[source]) + ' for ' + source)
+    }
+  return true
+}
+
 export default function ( router, server ) {
   const options = {
     root: __dirname + '/../public'
@@ -107,30 +143,24 @@ export default function ( router, server ) {
   });
 
   // Post route to accept demo push subscription
-  router.post('/save-subscription/', function (req, res) {
-    const isValidSaveRequest = (req, res) => {
-      // TODO: check for complete subscription data
-      console.log('Taglist? ' + JSON.stringify(req.body.tags))
-      if (!req.body || !req.body.endpoint) {
-        // Not a valid subscription.
-        res.status(400);
-        res.setHeader('Content-Type', 'application/json');
-        res.send(JSON.stringify({
-          error: {
-            id: 'no-endpoint',
-            message: 'Subscription must have an endpoint.'
-          }
-        }));
-        return false;
-      }
-      return true;
-    };
-    return saveSubscriptionToDatabase(req.body, req.ip, req.connection.remotePort)
-    .then(function(subscriptionId) {
+  router.post('/save-subscription/', async function (req, res) {
+    if (!req.body || !req.body.endpoint) {
+      res.status(400);
+      res.setHeader('Content-Type', 'application/json');
+      res.send(JSON.stringify({
+        error: {
+          id: 'no-endpoint',
+          message: 'Subscription must have an endpoint.'
+        }
+      }));
+      return;
+    }
+
+    try {
+      saveSubscriptionToDatabase(req.body, req.ip, req.connection.remotePort)
       res.setHeader('Content-Type', 'application/json');
       res.send(JSON.stringify({ data: { success: true } }));
-    })
-    .catch(function(err) {
+    } catch (err) {
       res.status(500);
       res.setHeader('Content-Type', 'application/json');
       res.send(JSON.stringify({
@@ -139,92 +169,35 @@ export default function ( router, server ) {
           message: 'The subscription was received but we were unable to save it to our database.'
         }
       }));
-    });
-
-    // Non-persistent save routine--refreshes with server restart
-    function saveSubscriptionToDatabase(subscription, ipAddr, port) {
-      console.log('In save part of routine')
-      // console.log('Sub details' + JSON.stringify(subscription))
-      let source = ipAddr + ':' + port
-      // Cut syntactic ipv6 cruft from front of address
-      source = source.slice(7)
-      console.log('Source: ' +  source)
-
-      // In memory database store
-      // savedSubscription = subscription ; debug
-      subscriptions[source] = subscription
-
-      // Debugging time; let's log whole array
-      for (let [source, subscription] of Object.entries(subscriptions)) {
-          console.log("Entry: " + JSON.stringify(subscriptions[source]) + ' for ' + source)
-        }
-      return new Promise(function(resolve, reject) {
-
-        // TODO: add persistence
-        /*
-        db.insert(subscription, function(err, newDoc) {
-          if (err) {
-            reject(err);
-            return;
-          }
-          */
-          // resolve(newDoc._id);
-          resolve(true)
-        })
-      }
-    })
+    }
+  })
 
   // Fetch uploaded file handled by "storage" object in multer
   // Process resulting files for later viewing
-  router.post('/uploadHandler', function(req, res) {
-    if (req.body) {
-        console.log('Req body: ' + JSON.stringify(req.body))
+  router.post('/uploadHandler', async function(req, res) {
+    try {
+      await uploadFile(req, res)
+    } catch (err) {
+      return res.end('Error uploading file')
     }
 
-    /* POST-PROCESSING ENTRY POINT */
+    const storedFilename = req.file.filename,
+      filePath = './uploads/' + storedFilename,
+      dziBase = './public/tiles/' + storedFilename
 
-    // 1. Attempt to upload file
-    // 2. Process images
-    // 3. Pass pointers back to requesting client
-    upload(req, res, function(err) {
-      if (err) {
-        return res.end('Error uploading file')
-      }
-      console.log('Uploading file: ' + req.file.filename)
+    try {
+      await Promise.all([
+        sharpToFile(sharp(filePath).resize(200).jpeg(),
+          './public/thumbs/' + storedFilename + '-thumb'),
+        sharpToFile(sharp(filePath).resize(1000).png(),
+          './public/images/' + storedFilename + '-1k'),
+        sharpToFile(sharp(filePath).tile(256), dziBase)
+      ])
+    } catch (err) {
+      console.log('Image processing error:', err)
+    }
 
-      // Here we leverage sharp.js to rapidly process the uploaded image
-      const storedFilename = req.file.filename,
-        filePath = './uploads/' + storedFilename,
-        dziBase = './public/tiles/' + storedFilename
-
-      // We should test for image size, etc., right here to be smarter below!
-
-      // Make a thumbnail 200 px wide, scaled, MUST BE JPG for lightbox
-      sharp(filePath)
-        .resize(200)
-        .jpeg()
-        .toFile('./public/thumbs/' + storedFilename + '-thumb', function(err) {
-          console.log(err)
-        })
-
-      // This scales down larger images to cut down file size
-      //   (except currently it scales up, too . . . . )
-      sharp(filePath)
-        .resize(1000)
-        .png()
-        .toFile('./public/images/' + storedFilename + '-1k', function(err) {
-          console.log(err)
-        })
-
-      // Generate zoomer tiles
-      sharp(filePath).tile(256)
-        .toFile(dziBase, function(err, info) {
-          console.log(err)
-        })
-      // Pass back name -- maybe more soon??
-      res.send(JSON.stringify(storedFilename))
-      //res.sendStatus(200);
-    })
+    res.send(JSON.stringify(storedFilename))
   })
   // Service routines for push notifications
   function sendNotifications(customMessage) {
@@ -248,9 +221,9 @@ export default function ( router, server ) {
         console.log('Push payload: ' + payload)
         const pushOptions = {
           vapidDetails: {
-            subject: 'mailto:brianc@palaver.net',
-            publicKey: 'BJZhZZUqIwbwbGci_pheC3wTwNFcF5btmH7JPCFCF22gk7iJaXmrLznrtBQI_C_HtWZh9BFnwCVKfz7oVgTmaPA',
-            privateKey: 'VCtWHVxRI-MuLAYzcONx-UW38Hwi2qKK2RND_QsgvS8'
+            subject: process.env.VAPID_SUBJECT || 'mailto:brianc@palaver.net',
+            publicKey: process.env.VAPID_PUBLIC_KEY || 'BJZhZZUqIwbwbGci_pheC3wTwNFcF5btmH7JPCFCF22gk7iJaXmrLznrtBQI_C_HtWZh9BFnwCVKfz7oVgTmaPA',
+            privateKey: process.env.VAPID_PRIVATE_KEY
           },
         }
 

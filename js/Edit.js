@@ -53,13 +53,17 @@ const EditDeleteWidget = React.createClass({
     return firebase.auth().currentUser;
   },
   loadRecordsFromServer: function() {
-    let URL = '/graphql?query=query+{imageRec(id: "' + this.props.record + '"){_id, title, filename, description, source, taglist}}',
-      req = new Request(URL, {method: 'POST', cache: 'reload'})
-    // console.log('Fetch URL: ' + URL)
-    fetch(req).then(function(response) {
+    const body = {
+      query: 'query GetImage($id: ID!) { imageRec(id: $id) { _id, title, filename, description, source, taglist } }',
+      variables: { id: this.props.record }
+    }
+    fetch('/graphql', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    }).then(function(response) {
       return response.json()
-    }).then (function(json) {
-      // console.log('json object: ' + JSON.stringify(json))
+    }).then(function(json) {
       this.setState({record: json.data.imageRec})
     }.bind(this))
   },
@@ -74,40 +78,48 @@ const EditDeleteWidget = React.createClass({
     this.context.router.push('/browse')
   },
   saveValues: function(fields) {
-      // Callback function for InfoFields sub-module
-      // See https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object/assign
       fieldValues = Object.assign({}, fieldValues, fields)
       fieldValues.filename = serverFilename
 
       // Clear out cached data in local store
       sessionStorage.removeItem('browse')
 
-      // Put together (awful-looking) query URL
-      let URL="/graphql?query=mutation+{updateImage(data: { _id: " + JSON.stringify(id) + ", title: " + JSON.stringify(fieldValues.title) +
-      ",description: " + JSON.stringify(fieldValues.description) + ", filename: " + JSON.stringify(fieldValues.filename)
-      +", source: " + JSON.stringify(fieldValues.source) + ", taglist: " + JSON.stringify(fieldValues.taglist)+ "})}",
-        req = new Request(URL, {method: 'POST', cache: 'reload'})
-      // console.log('Sending: ' + URL)
-      fetch(req).then(function(response) {
+      const body = {
+        query: 'mutation UpdateImage($data: ImageRecUpdate) { updateImage(data: $data) }',
+        variables: {
+          data: {
+            _id: id,
+            title: fieldValues.title,
+            description: fieldValues.description,
+            filename: fieldValues.filename,
+            source: fieldValues.source,
+            taglist: fieldValues.taglist
+          }
+        }
+      }
+      fetch('/graphql', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      }).then(function(response) {
         return response.json()
-      }.bind(this))
+      })
   },
   deleteRecord: function() {
-      // Callback to remove an image record in the DB
-
       // Clear out cached data in local store
       sessionStorage.removeItem('browse')
 
-      // Put together mutation URL
-      let URL="/graphql?query=mutation+{deleteImage(id: " + JSON.stringify(id) + ")}",
-        req = new Request(URL, {method: 'POST', cache: 'reload'})
-      console.log('Sending: ' + URL)
-      fetch(req).then(function(response) {
+      const body = {
+        query: 'mutation DeleteImage($id: ID!) { deleteImage(id: $id) }',
+        variables: { id: id }
+      }
+      fetch('/graphql', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      }).then(function(response) {
         return response.json()
-      }.bind(this))
-      // Mongod record is now gone; the saved original file + 2 created files
-      //  still will need to be deleted on the Server
-      //  How to do that??!!!???
+      })
   },
   render: function() {
     // console.log('rendering widget')

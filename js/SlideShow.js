@@ -7,16 +7,9 @@ import React from 'react'
 import { Section } from 'neal-react'
 import ImageGallery from 'react-image-gallery'
 
-// 1.
-// Cloud assets
-// const assetBase = 'http://oscon.saintjoe-cs.org:2016/graphql?'
-//
-// Local assets
-const assetBase = '/graphql?'
-
-// If no parameters fetch all the images
-//  Now (12/12/16) I wonder if this case will ever occur?
-const defaultQuery= 'query=query+{imageRecs{ _id, title, filename}}'
+const FIELDS = '_id, title, filename'
+const ALL_IMAGES_QUERY = `query { imageRecs { ${FIELDS} } }`
+const KEYWORD_SEARCH_QUERY = `query Lookup($keywords: String!) { lookup(keywords: $keywords) { ${FIELDS} } }`
 
 // We are just wrapping the react-image-gallery component
 export default class extends React.Component {
@@ -31,32 +24,32 @@ export default class extends React.Component {
       showThumbnails: true,
       showNav: true,
       slideInterval: 10000,
-      loadUrl: assetBase + defaultQuery,
+      searchKeywords: null,
       images: []
     }
   }
   componentDidMount() {
-    // console.log('loadUrl is ' + this.state.loadUrl)
-
-    // Note: this test has a callback!!
-    // If a parameterized custom list, render it
-    console.log('Slides props: ', JSON.stringify(this.props))
-    if (this.props.match.params.viewSet) {
-      this.setState({loadUrl: assetBase + this.props.match.params.viewSet}, function(){
+    const viewSet = this.props.match.params.viewSet
+    if (viewSet && viewSet !== '_all') {
+      this.setState({searchKeywords: decodeURIComponent(viewSet)}, function(){
         this.loadRecordsFromServer()
         }.bind(this));
     } else {
-      // Default is to show all images
       this.loadRecordsFromServer()
     }
   }
   loadRecordsFromServer() {
-    // console.log('Slideshow: Getting records')
-    let URL = this.state.loadUrl,
-      req = new Request(URL, {method: 'POST', cache: 'reload'})
-    fetch(req).then(function(response) {
+    const body = this.state.searchKeywords
+      ? { query: KEYWORD_SEARCH_QUERY, variables: { keywords: this.state.searchKeywords } }
+      : { query: ALL_IMAGES_QUERY }
+
+    fetch('/graphql', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    }).then(function(response) {
       return response.json()
-    }).then (function(json) {
+    }).then(function(json) {
       // console.log('json object: ' + JSON.stringify(json))
       // 2.
       // cloud assets:

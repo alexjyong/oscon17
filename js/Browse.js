@@ -18,17 +18,9 @@ import SearchBar from 'react-search-bar'
 // Hey ios/old Explorer, here's the polyfill for fetch()
 import 'whatwg-fetch'
 
-//
-// 1.
-// Select one of the two to configure for local/cloud access
-// Local assets
-const assetBase = '/graphql?'
-//
-// Cloud assets
-// const assetBase = 'http://www.scene-history.org/graphql?'
-
-let queryTarget = "query=query+{imageRecs{_id, title, filename, description, source, taglist}}"
-const queryBase = "query=query+{imageRecs{_id, title, filename, description, source, taglist}}"
+const FIELDS = '_id, title, filename, description, source, taglist'
+const ALL_IMAGES_QUERY = `query { imageRecs { ${FIELDS} } }`
+const KEYWORD_SEARCH_QUERY = `query Lookup($keywords: String!) { lookup(keywords: $keywords) { ${FIELDS} } }`
 
 // Working to figure out griddle-react 1.0 components
 // Thank God for https://griddlegriddle.github.io/Griddle/examples/getDataFromRowIntoCell/
@@ -101,23 +93,22 @@ const Button = React.createClass({
 // InfoTable wraps Griddle, SearchBar, and Button components
 const InfoTable = React.createClass({
   loadRecordsFromServer: function() {
-    console.log('Browse: fetching ' + URL)
-    let req = new Request(this.state.fetchURL, {method: 'POST', cache: 'reload'})
+    const body = this.state.searchKeywords
+      ? { query: KEYWORD_SEARCH_QUERY, variables: { keywords: this.state.searchKeywords } }
+      : { query: ALL_IMAGES_QUERY }
 
-    // Use fetch API; -==> this needs a polyfill in iOS
-    fetch(req).then(function(response) {
+    fetch('/graphql', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    }).then(function(response) {
       return response.json()
-    }).then (function(json) {
-      // console.log('json object: ' + JSON.stringify(json))
-
-      // All records or just search results? (imageRecs)
+    }).then(function(json) {
       if (json.data.imageRecs)
         this.setState({records: json.data.imageRecs})
       else
-        // Search results (lookup)
         this.setState({records: json.data.lookup})
 
-      // Reset record and cache returned data
       json.data = undefined
       sessionStorage.setItem('browse', JSON.stringify(this.state))
     }.bind(this))
@@ -125,30 +116,19 @@ const InfoTable = React.createClass({
   getInitialState: function() {
     let initValues = {
       records: [],
-      fetchURL: "",
+      searchKeywords: null,
       currentPage: 1,
     }
 
     // Pre-load records[] object array from sessionStorage
-    // console.log('Checking session storage in initial state')
     if (sessionStorage.getItem('browse') != null) {
       initValues = JSON.parse(sessionStorage.getItem('browse'))
       }
     return initValues;
   },
   componentDidMount: function() {
-    // console.log('Infotable history: ' + JSON.stringify(this.props.history))
-    // console.log('Infotable state: ' + JSON.stringify(this.state))
-
-    // Extract query part only of URL (i.e. the part after the '?')
-    queryTarget = this.state.fetchURL.substring(this.state.fetchURL.indexOf('?')+1)
-
-    // Async note:
-    this.setState( {fetchURL: this.props.url}, function() {
-      //the conditional data fetch here is in a CALLBACK
-      if ((this.state.records == null) || this.state.records.length == 0)
-        this.loadRecordsFromServer()
-      })
+    if ((this.state.records == null) || this.state.records.length == 0)
+      this.loadRecordsFromServer()
     },
   componentWillUnmount: function () {
     // Need to remember which page we're on before leaving
@@ -159,33 +139,23 @@ const InfoTable = React.createClass({
     },
   onSearch(input) {
     if (!input) return
-    // console.info(`Searching "${input}"`)
-    queryTarget = 'query=query+{lookup(keywords: "' +  input + '" ){_id, title, filename, description, source, taglist}}'
-
-    // 2.
-    // Local assets
-    let searchURL = assetBase + queryTarget
-    // Cloud assets
-    // ALSO OUTDATED
-    // let searchURL = 'http://oscon.saintjoe-cs.org:2016/graphql?' + queryTarget
-
-    // Callback fires when this.state object has been updated
-    this.setState({fetchURL: searchURL}, function(){
+    this.setState({searchKeywords: input}, function(){
         this.loadRecordsFromServer()
         sessionStorage.setItem('browse', JSON.stringify(this.state))
         }.bind(this))
     },
     // This is the very heavy moment we switch to a new view
     handleCustomSlideshowClick() {
-      this.props.history.push('/slides/' + queryTarget)
-      // this.context.router.push('/slides/' + queryTarget)
+      const viewSet = this.state.searchKeywords
+        ? encodeURIComponent(this.state.searchKeywords)
+        : '_all'
+      this.props.history.push('/slides/' + viewSet)
     },
     clearStore() {
-      // console.log('Handling reset click')
       sessionStorage.removeItem('browse')
-      queryTarget = queryBase
-      this.state.fetchURL = assetBase + queryTarget
-      this.loadRecordsFromServer()
+      this.setState({searchKeywords: null}, function() {
+        this.loadRecordsFromServer()
+      }.bind(this))
     },
     // Functions to remember current page across mounts
     _onNext: function() {
@@ -265,7 +235,6 @@ export default React.createClass ( {
       <div>
         <InfoTable
           history = { this.props.history }
-          url={ assetBase + queryBase }
           />
       </div>
     )

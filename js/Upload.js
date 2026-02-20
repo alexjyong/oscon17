@@ -117,20 +117,28 @@ export default React.createClass ( {
    return firebase.auth().currentUser
  },
  saveValues: function(fields) {
-    // Callback function for InfoFields sub-module
-    // See https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object/assign
     fieldValues = Object.assign({}, fieldValues, fields)
     fieldValues.filename = serverFilename
-    // Put together (awful-looking) query URL
-    let URL="/graphql?query=mutation+{addImage(data: { title: " + JSON.stringify(fieldValues.title) +
-      ",description: " + JSON.stringify(fieldValues.description) + ", filename: " + JSON.stringify(fieldValues.filename)
-      +", source: " + JSON.stringify(fieldValues.source) + ", taglist: " + JSON.stringify(fieldValues.taglist)+ "})}",
-      req = new Request(URL, {method: 'POST', cache: 'reload'})
-    console.log(queryURL)
+
+    const body = {
+      query: 'mutation AddImage($data: ImageRecInput!) { addImage(data: $data) }',
+      variables: {
+        data: {
+          title: fieldValues.title,
+          description: fieldValues.description,
+          filename: fieldValues.filename,
+          source: fieldValues.source,
+          taglist: fieldValues.taglist
+        }
+      }
+    }
     // Reset the field values here!!
     fieldValues = Object.assign({}, fieldValues, blankFieldValues)
-    // console.log('Sending: ' + URL)
-    fetch(req).then(function(response) {
+    fetch('/graphql', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    }).then(function(response) {
       return response.json()
     })
 },
