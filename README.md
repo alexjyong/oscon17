@@ -49,17 +49,53 @@ http://127.0.0.1:8080
 ```
 
 
-### Docker
-Run inside a docker container:
+### Docker (recommended)
 
-```
-docker run -p 3000:80 -v "$PWD"/public:/usr/local/apache2/htdocs/ httpd:2.4
+Requires Docker and Docker Compose. Runs the app and MongoDB together with no
+other local dependencies needed.
+
+```bash
+docker compose up -d
 ```
 
-Visit `http://<YOUR_DOCKER_MACHINE_IP>:3000`
+- HTTP: `http://localhost:8080`
+- HTTPS: `https://localhost:4443` (self-signed cert -- your browser will warn you, that's expected)
 
-Run app in server mode:
+View logs:
 
+```bash
+docker compose logs -f app
 ```
-npm start
+
+Stop and remove containers:
+
+```bash
+docker compose down
 ```
+
+To also remove the database volume (wipes all stored data):
+
+```bash
+docker compose down -v
+```
+
+Rebuild after code changes:
+
+```bash
+docker compose build && docker compose up -d
+```
+
+#### Environment variables
+
+Copy `.env.example` to `.env` and fill in values before starting if you want
+to override defaults (VAPID push notification keys, custom TLS cert paths, CORS
+origins, etc.):
+
+```bash
+cp .env.example .env
+# edit .env, then:
+docker compose up -d
+```
+
+The VAPID private key has no default -- push notifications will fail silently
+until `VAPID_PRIVATE_KEY` is set.

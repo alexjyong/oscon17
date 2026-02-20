@@ -20,6 +20,9 @@ services:
       - TLS_CERT_PATH=/certs/server.crt
       - CORS_ORIGINS=http://localhost:8080,https://localhost:4443
       - MONGO_HOST=mongo
+      - VAPID_SUBJECT
+      - VAPID_PUBLIC_KEY
+      - VAPID_PRIVATE_KEY
     volumes:
       - uploads:/app/uploads
       - thumbs:/app/public/thumbs
