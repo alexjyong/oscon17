@@ -17,17 +17,13 @@ import Upload from './Upload'
 import SlideShow from './SlideShow'
 import Subscribe from './Subscribe'
 import Announce from './Announce'
-// import LoginOut from './Login.js'
+import Header from './Header'
 
 // Toplevel CSS
 import "../css/main.scss"
 
 // Components rendered on every view
-import Header from './Header'
 import Footer from './Footer'
-
-// Maybe some notifications for OSCON17?
-import webPush from 'web-push'
 
 // Render application in main div - upgraded for react-route v4
 ReactDOM.render((
@@ -47,6 +43,7 @@ ReactDOM.render((
         <Route path = "/slides/:viewSet" component = { SlideShow } />
         <Route path = "/subscribe" component = { Subscribe } />
         <Route path = "/announce/:topic" component = { Announce } />
+        <Route path = "/login" component = { Header } />
       </Switch>
       <Route component = { Footer } />
     </div>

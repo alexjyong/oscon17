@@ -90,32 +90,22 @@ const blankFieldValues = {
 //  https://www.viget.com/articles/building-a-multi-step-registration-form-with-react
 export default React.createClass ( {
  getInitialState: function() {
-   // Stepping stages are overkill for this project, but intrinsically interesting
    return {
-     isLoggedIn: this.checkSignedInWithMessage(),
+     isLoggedIn: false,
      step : 1,
   }
  },
  componentDidMount: function() {
-   // This callback seems to confuse react after the first time it's called
-   firebase.auth().onAuthStateChanged(this.onAuthStateChanged)
+   fetch('/api/me')
+     .then(function(res) { return res.json() })
+     .then(function(data) {
+       if (data.user) {
+         this.setState({ isLoggedIn: true })
+       } else {
+         this.props.history.push('/login')
+       }
+     }.bind(this))
   },
-  onAuthStateChanged: function(user) {
-    if (user) {
-      this.setState( {
-        isLoggedIn: true,
-      })
-    }
-    else {
-      this.setState( {
-        isLoggedIn: false,
-      })
-    }
-  },
- checkSignedInWithMessage: function() {
-   // Return true if the user is signed in Firebase
-   return firebase.auth().currentUser
- },
  saveValues: function(fields) {
     fieldValues = Object.assign({}, fieldValues, fields)
     fieldValues.filename = serverFilename

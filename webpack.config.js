@@ -46,7 +46,11 @@ module.exports = {
       },
       {
         test: /\.scss$/,
-        loader: ["style", "css", "sass"]
+        use: [
+          'style-loader',
+          'css-loader',
+          { loader: 'sass-loader', options: { implementation: require('sass') } }
+        ]
       }
     ]
   },

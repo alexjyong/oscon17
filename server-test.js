@@ -12,10 +12,16 @@ import http from 'http'
 import https from 'https'
 import bodyParser from 'body-parser'
 
+import session from 'express-session'
+import connectMongo from 'connect-mongo'
+const MongoStore = connectMongo(session)
+
 // Our custom schema
 import mySchema from './graphql'
 // Set server-side routes
-import configRoutes from './js/server-routes'
+import configRoutes, { initSubscriptionsCache } from './js/server-routes'
+import SubscriptionModel from './models/subscription'
+import passport from './js/auth'
 
 const dbName = 'oscon-test'
 
@@ -65,6 +71,16 @@ app.use(compression())
 app.use(bodyParser.urlencoded({ extended: false }))
 app.use(bodyParser.json())
 
+const mongoUrl = 'mongodb://' + (process.env.MONGO_HOST || 'localhost') + '/' + dbName
+app.use(session({
+  secret: process.env.SESSION_SECRET || 'dev-secret-change-in-production',
+  resave: false,
+  saveUninitialized: false,
+  store: new MongoStore({ url: mongoUrl })
+}))
+app.use(passport.initialize())
+app.use(passport.session())
+
 // GraphqQL server route
 // This "route" is special API call to GraphQL interface
 app.use('/graphql' ,graphqlHTTP({
@@ -84,9 +100,12 @@ app.use(express.static(path.join(__dirname, '/public')))
 mongoose.Promise = global.Promise;
 // assert.equal(query.exec().constructor, global.Promise);
 
-// Connect to mongo database
+// Connect to mongo database and warm subscription cache
 const mongoHost = process.env.MONGO_HOST || 'localhost'
 mongoose.connect('mongodb://' + mongoHost + '/' + dbName)
+  .then(() => SubscriptionModel.find({}))
+  .then(initSubscriptionsCache)
+  .catch(err => console.log('Failed to load subscription cache:', err))
 
 // start HTTP server
 server.listen(8080)

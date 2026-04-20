@@ -1,19 +1,11 @@
-FROM node:8
-
-# Debian Stretch is EOL -- point to archived repos
-RUN echo "deb http://archive.debian.org/debian stretch main" > /etc/apt/sources.list && \
-    echo "deb http://archive.debian.org/debian-security stretch/updates main" >> /etc/apt/sources.list
-
-# Install libvips from system packages (sharp 0.17's bintray download is dead)
-RUN apt-get -o Acquire::Check-Valid-Until=false update && \
-    apt-get install -y --no-install-recommends libvips-dev && \
-    rm -rf /var/lib/apt/lists/*
+FROM node:20
 
 WORKDIR /app
 
 # Install deps first for layer caching
-COPY package.json package-lock.json* ./
-RUN npm install && npm install react-search-bar@1.1.4
+# Delete lockfile so npm respects the updated package.json versions
+COPY package.json ./
+RUN npm install --legacy-peer-deps && npm install --legacy-peer-deps react-search-bar@1.1.4
 
 # Copy app source
 COPY . .

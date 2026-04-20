@@ -19,7 +19,7 @@ npm install
 ```
 
 
-###Production Version
+### Production Version
 
 Transpile the Javascript using Babel:
 
@@ -37,7 +37,7 @@ Note the bundle.js file, which webpack creates and is sent to the client is
 executed to freshen up the bundle
 
 
-###Development Version
+### Development Version
 
 Run with webpack, hot reload is included so there is no need for refreshing the client:
 
@@ -99,3 +99,41 @@ docker compose up -d
 
 The VAPID private key has no default -- push notifications will fail silently
 until `VAPID_PRIVATE_KEY` is set.
+
+#### Authentication
+
+Authentication uses [Passport.js](https://www.passportjs.org/) with a local email/password strategy. Sessions are persisted to MongoDB via `connect-mongo`.
+
+**Creating the first user**
+
+Option 1 — seed script (recommended for local dev):
+
+```bash
+node scripts/seed-user.js admin@example.com mypassword "Admin User"
+# or with Docker:
+docker compose exec app node scripts/seed-user.js admin@example.com mypassword "Admin User"
+```
+
+Option 2 — HTTP endpoint (useful in CI or staging):
+
+```bash
+curl -X POST http://localhost:8080/register \
+  -H "Content-Type: application/json" \
+  -H "x-admin-secret: YOUR_ADMIN_SECRET" \
+  -d '{"email":"admin@example.com","password":"mypassword","displayName":"Admin User"}'
+```
+
+**Required environment variables**
+
+| Variable | Purpose | Default |
+|---|---|---|
+| `SESSION_SECRET` | Signs session cookies — set a long random string | none (required) |
+| `ADMIN_SECRET` | Guards the `POST /register` endpoint | none (required) |
+
+Set these in `.env` (copy from `.env.example`) or in `docker-compose.yml` before starting.
+
+#### Push notification subscriptions
+
+Push subscriptions are persisted to MongoDB, so they survive server restarts.
+The `mongo-data` Docker volume retains all subscription data across `docker compose down`/`up` cycles.
+To wipe subscriptions along with all other stored data, use `docker compose down -v`.

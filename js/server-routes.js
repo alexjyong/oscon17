@@ -6,6 +6,9 @@ import sharp from 'sharp'
 import multer from 'multer'
 import cb from 'cb'
 import webPush from 'web-push'
+import SubscriptionModel from '../models/subscription'
+import UserModel from '../models/user'
+import passport from './auth'
 
 // Set of possible notification classes
 const notifyGroups = ["image", "news", "publish", "program", "meeting"]
@@ -50,22 +53,37 @@ function sharpToFile(pipeline, outputPath) {
   })
 }
 
-// Non-persistent save routine--refreshes with server restart
-function saveSubscriptionToDatabase(subscription, ipAddr, port) {
+async function saveSubscriptionToDatabase(subscription, ipAddr, port) {
+  // Persists to MongoDB and updates in-memory cache on success
   console.log('In save part of routine')
   let source = ipAddr + ':' + port
   // Cut syntactic ipv6 cruft from front of address
   source = source.slice(7)
-  console.log('Source: ' +  source)
+  console.log('Source: ' + source)
 
-  // In memory database store
+  await SubscriptionModel.findOneAndUpdate(
+    { endpoint: subscription.endpoint },
+    { ...subscription, source },
+    { upsert: true, new: true }
+  )
+
+  // Update in-memory cache only after successful DB write
   subscriptions[source] = subscription
 
-  // Debugging time; let's log whole array
   for (let [source, subscription] of Object.entries(subscriptions)) {
-      console.log("Entry: " + JSON.stringify(subscriptions[source]) + ' for ' + source)
-    }
-  return true
+    console.log("Entry: " + JSON.stringify(subscriptions[source]) + ' for ' + source)
+  }
+}
+
+function requireAuth(req, res, next) {
+  if (req.isAuthenticated()) return next()
+  res.redirect('/login')
+}
+
+export function initSubscriptionsCache(docs) {
+  docs.forEach(doc => {
+    subscriptions[doc.source] = doc.toObject()
+  })
 }
 
 export default function ( router, server ) {
@@ -84,7 +102,11 @@ export default function ( router, server ) {
     res.sendFile('index.html', options)
   })
 
-  router.get('/upload', function(req, res) {
+  router.get('/login', function(req, res) {
+    res.sendFile('index.html', options)
+  })
+
+  router.get('/upload', requireAuth, function(req, res) {
     console.log('Server upload chosen')
     res.sendFile('index.html', options)
   })
@@ -99,7 +121,7 @@ export default function ( router, server ) {
     res.sendFile('index.html', options)
   });
 
-  router.get('/edit*', function(req, res) {
+  router.get('/edit*', requireAuth, function(req, res) {
     console.log('Server edit chosen')
     res.sendFile('index.html', options)
   });
@@ -142,6 +164,59 @@ export default function ( router, server ) {
     res.sendStatus(200);
   });
 
+  // Auth routes
+  router.post('/login', function(req, res, next) {
+    if (!req.body || !req.body.email || !req.body.password) {
+      return res.status(400).json({ error: 'Email and password are required' })
+    }
+    passport.authenticate('local', function(err, user, info) {
+      if (err) return next(err)
+      if (!user) return res.status(401).json({ error: info ? info.message : 'Invalid email or password' })
+      req.logIn(user, function(err) {
+        if (err) return next(err)
+        return res.json({ user: { email: user.email, displayName: user.displayName } })
+      })
+    })(req, res, next)
+  })
+
+  router.post('/logout', function(req, res) {
+    req.logout(function() {
+      req.session.destroy(function() {
+        res.json({ success: true })
+      })
+    })
+  })
+
+  router.get('/api/me', function(req, res) {
+    if (req.isAuthenticated()) {
+      return res.json({ user: { email: req.user.email, displayName: req.user.displayName } })
+    }
+    res.json({ user: null })
+  })
+
+  router.post('/register', async function(req, res) {
+    if (req.headers['x-admin-secret'] !== process.env.ADMIN_SECRET) {
+      return res.status(403).json({ error: 'Forbidden' })
+    }
+    if (!req.body || !req.body.email || !req.body.password) {
+      return res.status(400).json({ error: 'Email and password are required' })
+    }
+    try {
+      const user = new UserModel({
+        email: req.body.email,
+        displayName: req.body.displayName
+      })
+      user.password = req.body.password
+      await user.save()
+      res.status(201).json({ success: true, email: user.email })
+    } catch (err) {
+      if (err.code === 11000) {
+        return res.status(409).json({ error: 'Email already registered' })
+      }
+      throw err
+    }
+  })
+
   // Post route to accept demo push subscription
   router.post('/save-subscription/', async function (req, res) {
     if (!req.body || !req.body.endpoint) {
@@ -157,7 +232,7 @@ export default function ( router, server ) {
     }
 
     try {
-      saveSubscriptionToDatabase(req.body, req.ip, req.connection.remotePort)
+      await saveSubscriptionToDatabase(req.body, req.ip, req.connection.remotePort)
       res.setHeader('Content-Type', 'application/json');
       res.send(JSON.stringify({ data: { success: true } }));
     } catch (err) {
@@ -175,6 +250,9 @@ export default function ( router, server ) {
   // Fetch uploaded file handled by "storage" object in multer
   // Process resulting files for later viewing
   router.post('/uploadHandler', async function(req, res) {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ error: 'Authentication required' })
+    }
     try {
       await uploadFile(req, res)
     } catch (err) {

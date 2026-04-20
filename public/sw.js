@@ -1,4 +1,4 @@
-var CACHE_NAME = 'scene-history-v1';
+var CACHE_NAME = 'scene-history-v2';
 var urlsToCache = [
   '/',
   '/index.html',
@@ -9,9 +9,6 @@ var urlsToCache = [
   '/js/bundle.js',
   'libs/bootstrap.min.js',
   'libs/jquery.min.js',
-  'libs/firebase.js',
-  'libs/firebase-app.js',
-  'libs/firebase-auth.js',
   '/img/background.png'
 ];
 

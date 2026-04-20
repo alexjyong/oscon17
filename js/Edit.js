@@ -23,34 +23,21 @@ let id = '',
 const EditDeleteWidget = React.createClass({
   getInitialState: function() {
     return {
-      isLoggedIn: this.checkSignedInWithMessage(),
+      isLoggedIn: false,
       step: 1
     }
   },
   componentDidMount: function() {
-    // console.log('Mounting event')
-    // console.log(this.state.record)
-
-    // Extract query part only of URL (i.e. the part after the '?')
-    let queryTarget = "";
-    firebase.auth().onAuthStateChanged(this.onAuthStateChanged)
-    this.loadRecordsFromServer()
-  },
-  onAuthStateChanged: function(user) {
-     if (user) {
-       this.setState( {
-         isLoggedIn: true,
-       })
-     }
-     else {
-       this.setState( {
-         isLoggedIn: false,
-       })
-     }
-   },
-  checkSignedInWithMessage: function() {
-    // Return true if the user is signed in Firebase
-    return firebase.auth().currentUser;
+    fetch('/api/me')
+      .then(function(res) { return res.json() })
+      .then(function(data) {
+        if (data.user) {
+          this.setState({ isLoggedIn: true })
+          this.loadRecordsFromServer()
+        } else {
+          this.context.router.push('/login')
+        }
+      }.bind(this))
   },
   loadRecordsFromServer: function() {
     const body = {
