@@ -35,16 +35,16 @@ The project demonstrates modern web technologies of its era (circa 2016–2017):
 
 | Layer | Technology |
 |---|---|
-| Frontend | React 15.4, React Router v4 (react-router-dom v4.0.0-beta.7), neal-react (UI kit), Griddle + LocalPlugin (tables), OpenSeaDragon (zoom), react-dropzone, react-image-gallery, react-select, react-search-bar |
+| Frontend | React 15.4, React Router v4 (react-router-dom v4.0.0-beta.7), neal-react (UI kit), Griddle + LocalPlugin (tables), OpenSeaDragon (zoom), react-dropzone, react-image-gallery, react-select, react-search-bar, whatwg-fetch polyfill |
 | Build | Webpack 3.3, Babel 6 (es2015 + stage-0 + react presets), UglifyJS minification, CommonsChunkPlugin (vendor.bundle.js) |
 | Backend | Express 4, body-parser, cors, compression, morgan (logging commented out by default) |
-| API | GraphQL v0.8 (express-graphql + GraphiQL), Mongoose resolvers with get-projection field selection |
+| API | GraphQL v0.8 (express-graphql + GraphiQL), Mongoose resolvers with get-projection field selection, mutations use async/await |
 | Database | MongoDB via Mongoose (ImageRec, GeoPointRec models) |
 | Image Processing | sharp v0.17 (thumbnails 200px JPG, resized 1000px PNG, DZI zoom tiles 256px) |
 | File Upload | multer v1.1 (disk storage to ./uploads/) |
 | PWA | Service Worker (sw.js), web-push v3.2, manifest.json, push.js (SW registration) |
 | Styling | SCSS → CSS via webpack style-loader + css-loader + sass-loader |
-| Auth | Firebase 3.9 (CDN scripts in public/libs/) — email/password active, Google/Facebook in Login.js not wired |
+| Auth | Firebase 3.9 (CDN scripts in public/libs/ + config in index.html) — email/password active, Google/Facebook in Login.js not wired |
 
 ### Directory Structure
 
@@ -168,11 +168,21 @@ npm run lint         # ESLint on .js/.jsx files
 
 - **Age of dependencies.** This project uses packages from ~2016 (React 15, Webpack 3, graphql v0.8). Dependencies are likely incompatible with modern Node.js versions. A major upgrade pass would be needed to run on current tooling.
 - **SSL certs are hardcoded.** `server-es6.js` reads certs from `/home/brianc/CERTS/`. Development uses `server-test.js` which also needs certs for HTTPS but can fall back to HTTP on port 8080.
-- **Firebase auth.** Firebase 3.9 loaded via CDN scripts in `public/libs/`. No Firebase config is visible in the codebase — credentials must be set up externally. Google/Facebook popup auth exists in `Login.js` but is not wired into the navigation; only email/password auth via Header.js is active.
+- **Firebase auth.** Firebase 3.9 loaded via CDN scripts in `public/libs/` with config initialized in `public/index.html` (apiKey, authDomain visible). Only email/password auth via Header.js is active. Google/Facebook popup auth exists in `Login.js` but is not wired into the navigation.
 - **Push notification VAPID keys** are embedded in source (`server-routes.js`, `sw.js`, and `push.js`). These should be rotated/regenerated for any production use.
 - **No automated tests.** `npm test` just exits with error code 1.
 - **In-memory subscription store.** Push subscriptions are stored in a module-level `subscriptions` object (lost on restart). The TODO comment in `server-routes.js` notes persistence is not yet implemented.
 - **Unused code.** `Shell-new.js` + `client-routes.js` implement a code-splitting approach using `System.import` but are not the active entry point. `Login.js` (Google/Facebook auth) is not wired into the nav.
+- **Dead import.** Browse.js imports `react-redux` (`{ connect }`) but it's not in package.json — likely a leftover from an abandoned Redux plan. The import is unused; the component manages state locally via `sessionStorage`.
+- **Dead dependency.** `react-input-autosize` is in package.json but not imported by any component.
+- **`img-icons` symlink.** Zoom.js references `prefixUrl: "/img-icons/"` for OpenSeaDragon icons — this is a symlink pointing to `node_modules/openseadragon/build/openseadragon/images/`, not a missing directory.
+- **Deprecated lifecycle.** Four components use `componentWillMount` (deprecated in React 16+): Header.js, Asset.js, InfoFields.js, Login.js. All use `React.createClass` syntax.
+- **Client-side GraphQL.** All GraphQL calls use `fetch` with `POST` and `cache: 'reload'` — no Apollo/Relay, no query caching. 6 call sites across Browse.js, Upload.js, Edit.js (3x), and SlideShow.js.
+- **GraphQL API inconsistency.** Image queries call `getProjection(info.fieldNodes[0])` (correct for graphql v0.8) while geopoint queries call `getProjection(options.fieldASTs[0])` (older API). Both work but reflect different eras of the codebase.
+- **Unused `async` in mutations.** `graphql/mutations/image/update.js` and `delete.js` declare `async resolve()` but never `await` — they return the Mongoose promise directly.
+- **Delete mutation imports wrong type.** `graphql/mutations/image/delete.js` imports `imageRecUpdateType` (unused) instead of the input type it actually needs.
+- **Hidden push trigger.** `server-routes.js` exposes a `/sknnzix` route (GET) for triggering push notifications — accepts optional `:type/:msg` params. Used for demo/testing, not wired to any frontend UI.
+- **Package name mismatch.** `package.json` says `"name": "oscon16-spa"` (not oscon17).
 
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,
