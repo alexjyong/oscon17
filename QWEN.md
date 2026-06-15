@@ -11,20 +11,23 @@ The project demonstrates modern web technologies of its era (circa 2016–2017):
 ```
 ┌─────────────────────────────────────────────────┐
 │  Client (React SPA)                              │
-│  ── js/Shell.js (entry, React Router v4)         │
-│  ── js/*.js (components: Browse, Upload, Zoom…)  │
-│  ── public/sw.js (service worker)                │
-│  ── public/manifest.json (PWA manifest)          │
+│  ── js/Shell.js        # Active entry (BrowserRouter + Switch)
+│  ── js/Shell-new.js    # Alternative entry (code-split via System.import)
+│  ── js/*.js            # 17 view/presentational components
+│  ── public/sw.js       # Service worker (cache + push)
+│  ── public/manifest.json # PWA manifest
 ├─────────────────────────────────────────────────┤
 │  Server (Node/Express)                           │
-│  ── server-es6.js   (production HTTPS server)    │
-│  ── server-test.js  (development HTTP server)    │
-│  ── js/server-routes.js (file upload, push API)  │
-│  ── graphql/index.js (GraphQL schema)            │
+│  ── server-es6.js      # Production HTTPS (port 443)
+│  ── server-test.js     # Dev HTTP (8080) + HTTPS (4443)
+│  ── js/server-routes.js # SPA fallback, file upload (multer), push API
+│  ── graphql/index.js   # GraphQL schema (express-graphql + GraphiQL)
+│  ── Middleware: cors, compression, body-parser   │
 ├─────────────────────────────────────────────────┤
 │  Data                                            │
 │  ── MongoDB (models: ImageRec, GeoPointRec)      │
 │  ── Filesystem: ./public/images/, tiles/, thumbs/│
+│  ── ./uploads/       # Raw uploaded files (multer disk storage)
 └─────────────────────────────────────────────────┘
 ```
 
@@ -32,51 +35,73 @@ The project demonstrates modern web technologies of its era (circa 2016–2017):
 
 | Layer | Technology |
 |---|---|
-| Frontend | React 15.4, React Router v4, neal-react (UI kit), Griddle (tables), OpenSeaDragon (zoom), react-dropzone |
-| Build | Webpack 3, Babel 6 (es2015 + stage-0 + react presets) |
-| Backend | Express 4, Node.js |
-| API | GraphQL (express-graphql + graphql v0.8), GraphiQL enabled |
-| Database | MongoDB via Mongoose |
-| Image Processing | sharp (thumbnails, resized images, DZI zoom tiles) |
-| PWA | Service Worker (sw.js), web-push, manifest.json |
-| Styling | SCSS → CSS |
+| Frontend | React 15.4, React Router v4 (react-router-dom v4.0.0-beta.7), neal-react (UI kit), Griddle + LocalPlugin (tables), OpenSeaDragon (zoom), react-dropzone, react-image-gallery, react-select, react-search-bar |
+| Build | Webpack 3.3, Babel 6 (es2015 + stage-0 + react presets), UglifyJS minification, CommonsChunkPlugin (vendor.bundle.js) |
+| Backend | Express 4, body-parser, cors, compression, morgan (logging commented out by default) |
+| API | GraphQL v0.8 (express-graphql + GraphiQL), Mongoose resolvers with get-projection field selection |
+| Database | MongoDB via Mongoose (ImageRec, GeoPointRec models) |
+| Image Processing | sharp v0.17 (thumbnails 200px JPG, resized 1000px PNG, DZI zoom tiles 256px) |
+| File Upload | multer v1.1 (disk storage to ./uploads/) |
+| PWA | Service Worker (sw.js), web-push v3.2, manifest.json, push.js (SW registration) |
+| Styling | SCSS → CSS via webpack style-loader + css-loader + sass-loader |
+| Auth | Firebase 3.9 (CDN scripts in public/libs/) — email/password active, Google/Facebook in Login.js not wired |
 
 ### Directory Structure
 
 ```
 oscon17/
+├── css/                   # SCSS source (compiled by webpack to public/css/)
+│   └── main.scss          # Global styles entry point
 ├── js/                    # React components + server routes
-│   ├── Shell.js           # App entry, React Router setup
-│   ├── Launch.js          # Landing/home page (neal-react themed)
-│   ├── Browse.js          # Image search/browse (Griddle table + GraphQL)
+│   ├── Shell.js           # Active app entry, React Router v4 (BrowserRouter)
+│   ├── Shell-new.js       # Alternative shell using code-splitting (System.import)
+│   ├── App.js             # Root wrapper: Header + neal-react App + Footer
+│   ├── client-routes.js   # Code-split route definitions (unused, referenced by Shell-new)
+│   ├── Launch.js          # Landing/home page (neal-react themed Hero + testimonials)
+│   ├── Browse.js          # Image search/browse (Griddle table + GraphQL + SearchBar)
 │   ├── Upload.js          # Multi-step upload with Dropzone + Firebase auth
-│   ├── Zoom.js            # OpenSeaDragon high-res zoom viewer
-│   ├── SlideShow.js       # Slideshow viewer
-│   ├── server-routes.js   # Express routes: file upload, push notifications
-│   └── *.js               # Other views: Edit, Asset, Header, Footer, etc.
-├── graphql/               # GraphQL schema layer
+│   ├── Edit.js            # Edit/delete image records (Firebase-auth gated)
+│   ├── Asset.js           # Single image detail view with click-to-zoom
+│   ├── Zoom.js            # OpenSeaDragon high-res DZI zoom viewer
+│   ├── SlideShow.js       # react-image-gallery slideshow with controls
+│   ├── Subscribe.js       # Push notification subscription UI (react-select + web-push)
+│   ├── Announce.js        # Announcement page placeholder (topic-param routed)
+│   ├── Login.js           # Firebase auth UI (Google/Facebook popup — not wired to nav)
+│   ├── Header.js          # Navbar with login/logout + SubscribeBtn for push
+│   ├── Footer.js          # Static footer (Palaver Consulting address)
+│   ├── InfoFields.js      # Reusable image metadata form (title/desc/source/taglist)
+│   ├── Confirmation.js    # Post-upload/edit confirmation page
+│   └── server-routes.js   # Express routes: file upload (multer → ./uploads/), push notifications, SPA fallback
+├── graphql/               # GraphQL schema layer (graphql v0.8)
 │   ├── index.js           # Schema root (query + mutation types)
-│   ├── queries/           # image and geopoint query resolvers
-│   ├── mutations/         # image and geopoint mutation resolvers
-│   └── types/             # GraphQL type definitions + inputs
+│   ├── get-projection.js  # Utility: extracts field projections from AST
+│   ├── queries/           # image (single, multiple, keywords lookup) + geopoint (single, multiple, all)
+│   ├── mutations/         # image (add, update, delete) + geopoint (add only)
+│   └── types/             # GraphQL types: ImageRec, Geopoint + inputs (ImageRecInput, ImageRecUpdate, GeopointInput)
 ├── models/                # Mongoose schemas
 │   ├── image-rec.js       # ImageRec: title, description, filename, source, taglist
 │   └── geopoint.js        # GeoPointRec: imageId, lat/long/alt, comment
 ├── public/                # Static assets served to browser
 │   ├── js/bundle.js       # Webpack output (NOT in git; generated by `npm run build`)
-│   ├── css/main.scss      # Source SCSS (compiled by webpack)
+│   ├── js/vendor.bundle.js # Vendor chunk (react, openseadragon, griddle, etc.)
+│   ├── css/               # Compiled CSS (main.css + Bootstrap, Font Awesome, etc.)
 │   ├── sw.js              # Service worker (cache + push notifications)
-│   ├── manifest.json      # PWA manifest
+│   ├── manifest.json      # PWA manifest (standalone, portrait)
+│   ├── scripts/push.js    # Push notification setup (SW registration + subscribe/unsubscribe)
+│   ├── libs/              # CDN libs: Firebase 3.9, jQuery 3.1, Bootstrap min JS
+│   ├── fonts/             # Font Awesome web fonts
+│   ├── img/               # PWA icons, backgrounds, social proof photos
 │   ├── tiles/             # OpenSeaDragon DZI zoom tiles (generated on upload)
-│   ├── images/            # Processed/resized images
-│   └── thumbs/            # Thumbnails
-├── ops/                   # Operations/devops scripts (unexplored)
+│   ├── images/            # Processed/resized images (1000px wide PNG)
+│   └── thumbs/            # Thumbnails (200px wide JPG)
+├── ops/                   # Operations scripts
+│   └── deploy.sh          # Builds webpack -p and deploys public/ to S3 (nealjs.com)
 ├── server-es6.js          # Production HTTPS server (port 443, requires SSL certs)
-├── server-test.js         # Development HTTP server (port 8080 + 4443)
+├── server-test.js         # Development HTTP (8080) + HTTPS (4443) server
 ├── index.js               # Production entry (babel-register → server-es6)
 ├── index-local.js         # Dev entry (babel-register → server-test)
-├── webpack.config.js      # Webpack 3 config (babel-loader, SCSS, vendor chunk)
-├── .babelrc               # Babel presets/plugins
+├── webpack.config.js      # Webpack 3 config (babel-loader, SCSS, vendor chunk, Uglify)
+├── .babelrc               # Babel presets: react, stage-0, es2015 (modules:false)
 └── package.json           # Dependencies and scripts
 ```
 
@@ -126,21 +151,30 @@ npm run lint         # ESLint on .js/.jsx files
 
 - **ES6 throughout.** All source is written in ES6 (ES2015) with stage-0 proposals (class properties, etc.), transpiled by Babel.
 - **React class components.** Uses `React.createClass` and class syntax mixed; React 15.4 era patterns (context API, PropTypes).
-- **React Router v4.** Declarative routing with `<Route>`, `<Switch>`, `<NavLink>`.
-- **GraphQL schema-first.** Types in `graphql/types/`, queries in `graphql/queries/`, mutations in `graphql/mutations/`. GraphiQL playground enabled at `/graphql`.
+- **React Router v4.** Declarative routing with `<Route>`, `<Switch>`, `<NavLink>`. The active entry is `js/Shell.js` using `BrowserRouter`. An alternative code-splitting approach exists in `Shell-new.js` + `client-routes.js` using `System.import` but is not wired up.
+- **GraphQL schema-first.** Types in `graphql/types/`, queries in `graphql/queries/`, mutations in `graphql/mutations/`. GraphiQL playground enabled at `/graphql`. Image queries support single (`imageRec`), multiple (`imageRecs`), and keyword lookup (`lookup` via regex on title/description/source/taglist); geopoint queries support single, multiple, and all. Geopoint mutations only support `add` (no update/delete). All resolvers use `get-projection.js` for field selection. TODO in resolvers: subquery for related geopoint documents is not yet implemented.
 - **File upload pipeline.** Uploaded images go through `sharp` to produce:
   1. Thumbnail (200px wide, JPG) → `public/thumbs/`
   2. Resized image (1000px wide, PNG) → `public/images/`
   3. DZI zoom tiles (256px) → `public/tiles/`
-- **PWA.** Service worker caches core assets and handles push notifications. VAPID details are hardcoded in `server-routes.js` and `sw.js`.
-- **Session storage.** The Browse component persists its state (records, current page) in `sessionStorage` across navigations.
-- **bundle.js is generated.** The webpack output (`public/js/bundle.js`) is git-ignored and must be rebuilt after any client-side changes with `npm run build`.
+- **PWA.** Service worker (`public/sw.js`) caches core assets and handles push notifications. Push setup script at `public/scripts/push.js` registers the SW. VAPID keys are hardcoded in `server-routes.js`, `sw.js`, and `push.js`.
+- **Session storage.** The Browse component persists its state (records, current page) in `sessionStorage` across navigations. Asset.js reads from this same storage to look up image data.
+- **bundle.js is generated.** The webpack output (`public/js/bundle.js` and `public/js/vendor.bundle.js`) is git-ignored and must be rebuilt after any client-side changes with `npm run build`.
+- **Firebase auth.** Used in Upload.js, Edit.js, and Header.js for gating write operations. Firebase 3.9 loaded via CDN script in `public/libs/`. Login.js (Google/Facebook popup auth) exists but is not wired into the navigation.
+- **SPA fallback.** `server-routes.js` serves `index.html` for all view routes (`/`, `/home`, `/browse`, `/upload`, `/edit*`, `/zoomer*`, `/slides*`, `/asset*`) to support client-side routing. The `/announce*` route serves `announce.html` instead.
+- **Deployment.** `ops/deploy.sh` runs `webpack -p` and uploads `public/` to S3 bucket `s3://www.nealjs.com`.
 
 ## Important Notes
 
 - **Age of dependencies.** This project uses packages from ~2016 (React 15, Webpack 3, graphql v0.8). Dependencies are likely incompatible with modern Node.js versions. A major upgrade pass would be needed to run on current tooling.
 - **SSL certs are hardcoded.** `server-es6.js` reads certs from `/home/brianc/CERTS/`. Development uses `server-test.js` which also needs certs for HTTPS but can fall back to HTTP on port 8080.
-- **Firebase auth.** The Upload component references `firebase.auth()` but Firebase is loaded via a CDN script in `public/libs/`. No Firebase config is visible in the codebase.
-- **Push notification VAPID keys** are embedded in source (`server-routes.js` and `sw.js`). These should be rotated/regenerated for any production use.
+- **Firebase auth.** Firebase 3.9 loaded via CDN scripts in `public/libs/`. No Firebase config is visible in the codebase — credentials must be set up externally. Google/Facebook popup auth exists in `Login.js` but is not wired into the navigation; only email/password auth via Header.js is active.
+- **Push notification VAPID keys** are embedded in source (`server-routes.js`, `sw.js`, and `push.js`). These should be rotated/regenerated for any production use.
 - **No automated tests.** `npm test` just exits with error code 1.
 - **In-memory subscription store.** Push subscriptions are stored in a module-level `subscriptions` object (lost on restart). The TODO comment in `server-routes.js` notes persistence is not yet implemented.
+- **Unused code.** `Shell-new.js` + `client-routes.js` implement a code-splitting approach using `System.import` but are not the active entry point. `Login.js` (Google/Facebook auth) is not wired into the nav.
+
+<!-- SPECKIT START -->
+For additional context about technologies to be used, project structure,
+shell commands, and other important information, read the current plan
+<!-- SPECKIT END -->
