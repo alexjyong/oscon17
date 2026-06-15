@@ -37,3 +37,4 @@ public/js/
 
 # Release files
 release-builds
+.qwen/settings.json
