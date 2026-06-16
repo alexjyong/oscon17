@@ -46,6 +46,18 @@ npm run serve
 
 Then visit `http://127.0.0.1:8080`.
 
+### Docker (Full Stack)
+
+Start the complete application stack (Node server + MongoDB) with Docker Compose:
+
+```bash
+docker compose up
+```
+
+The app will be available at `http://localhost:8080`. HTTPS is also exposed on port 4443 with auto-generated self-signed certificates.
+
+Uploaded files persist across container restarts via named volumes.
+
 ### Docker (Static Serving)
 
 Serve the static `public/` directory via Apache:
@@ -55,5 +67,3 @@ docker run -p 3000:80 -v "$PWD"/public:/usr/local/apache2/htdocs/ httpd:2.4
 ```
 
 Visit `http://<DOCKER_IP>:3000`.
-
-> **Note:** This only serves static assets. For the full stack (Node server + MongoDB), see [IMPROVEMENT_ROADMAP.md](IMPROVEMENT_ROADMAP.md) for Docker Compose instructions.

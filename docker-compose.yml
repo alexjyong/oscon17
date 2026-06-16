@@ -1,0 +1,37 @@
+version: '3.8'
+
+services:
+  mongo:
+    image: mongo:4.4
+    volumes:
+      - mongo-data:/data/db
+    ports:
+      - "27017:27017"
+
+  app:
+    build: .
+    ports:
+      - "8080:8080"
+      - "4443:4443"
+    depends_on:
+      - mongo
+    environment:
+      - TLS_KEY_PATH=/certs/server.key
+      - TLS_CERT_PATH=/certs/server.crt
+      - CORS_ORIGINS=http://localhost:8080,https://localhost:4443
+      - MONGO_HOST=mongo
+      - VAPID_SUBJECT
+      - VAPID_PUBLIC_KEY
+      - VAPID_PRIVATE_KEY
+    volumes:
+      - uploads:/app/uploads
+      - thumbs:/app/public/thumbs
+      - images:/app/public/images
+      - tiles:/app/public/tiles
+
+volumes:
+  mongo-data:
+  uploads:
+  thumbs:
+  images:
+  tiles:

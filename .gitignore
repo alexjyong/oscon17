@@ -35,6 +35,12 @@ node_modules
 # Webpack bundle file
 public/js/
 
+# Webpack stats
+stats.json
+
+# Environment variables (keep secrets out of repo)
+.env
+
 # Release files
 release-builds
 .qwen/settings.json

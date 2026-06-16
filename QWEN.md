@@ -6,6 +6,8 @@
 
 The project demonstrates modern web technologies of its era (circa 2016–2017): React, GraphQL, service workers (PWA), web push notifications, and MongoDB.
 
+For Agents, there is a chance this project is being worked on in Github Codespaces. Take that into consideration.
+
 ### Architecture
 
 ```

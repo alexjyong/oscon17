@@ -1,0 +1,11 @@
+node_modules
+public/js
+uploads
+.git
+.gitignore
+*.md
+.qwen
+.specify
+.env
+.env.*
+!.env.example
