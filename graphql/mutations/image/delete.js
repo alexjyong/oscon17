@@ -22,7 +22,7 @@ export default {
     },
   async resolve (root, params, {}, options) {
     // console.log('Deleting: ' + params.id)
-    const updateResult = ImageRecModel
+    const updateResult = await ImageRecModel
     .findById(params.id)
     .remove()
     .exec()

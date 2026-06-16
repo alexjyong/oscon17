@@ -29,7 +29,7 @@ export default {
           source: params.data.source, taglist: params.data.taglist
         }
     // console.log(updateRec)
-    const updateResult = ImageRecModel
+    const updateResult = await ImageRecModel
     .findOneAndUpdate(query, updateRec)
 
 

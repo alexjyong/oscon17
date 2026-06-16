@@ -27,9 +27,9 @@ const dbName = 'oscon-test'
 
 const tlsKeyPath = process.env.TLS_KEY_PATH || '/home/brianc/CERTS/scene-history_org.key'
 const tlsCertPath = process.env.TLS_CERT_PATH || '/home/brianc/CERTS/www_scene-history_org_combined.crt'
-const privateKey = fs.readFileSync(tlsKeyPath),
-  certificate = fs.readFileSync(tlsCertPath),
-  credentials = {key: privateKey, cert: certificate}
+const privateKey = fs.readFileSync(tlsKeyPath);
+const certificate = fs.readFileSync(tlsCertPath);
+const credentials = {key: privateKey, cert: certificate};
 
 const app = express(),
   router = express.Router()
